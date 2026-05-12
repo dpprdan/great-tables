@@ -36,18 +36,16 @@ def _get_locnum_for_footnote_location(locname: loc.Loc | None) -> int | float:
         return 1
     elif isinstance(locname, loc.LocSubTitle):
         return 2
-    elif isinstance(locname, loc.LocStubhead):
+    elif isinstance(locname, (loc.LocStubhead, loc.LocStubheadLabel)):
         return 3
-    elif isinstance(locname, loc.LocSpannerLabels):
+    elif isinstance(locname, (loc.LocColumnHeader, loc.LocSpannerLabels)):
         return 4
-    elif isinstance(locname, loc.LocColumnLabels):
+    elif isinstance(locname, (loc.LocColumnLabels, loc.LocRowGroups)):
         return 5
-    elif isinstance(locname, (loc.LocBody, loc.LocStub)):
-        return 6  # Same as data since stub and data cells are on the same row level
-    elif isinstance(locname, loc.LocRowGroups):
-        return 5
-    elif isinstance(locname, loc.LocSummary):
+    elif isinstance(locname, (loc.LocGrandSummaryStub, loc.LocGrandSummary)):
         return 5.5
+    elif isinstance(locname, (loc.LocBody, loc.LocStub)):
+        return 6
     else:
         return 999  # Default to 999 for unknown locations
 

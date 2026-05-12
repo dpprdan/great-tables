@@ -1202,17 +1202,7 @@ def _(
     # Update footnote infos with location information
     updated_footnotes = []
     for footnote_info in new_footnotes:
-        # Determine locnum based on location type
-        if isinstance(loc, LocTitle):
-            locnum = 1
-        elif isinstance(loc, LocSubTitle):
-            locnum = 2
-        elif isinstance(loc, LocStubhead) or isinstance(loc, LocStubheadLabel):
-            locnum = 2.5
-        else:
-            locnum = 6  # Default for footer-area locations
-
-        updated_footnote = replace(footnote_info, locname=loc, locnum=locnum)
+        updated_footnote = replace(footnote_info, locname=loc)
         updated_footnotes.append(updated_footnote)
 
     return data._replace(
@@ -1244,7 +1234,7 @@ def _(loc: LocColumnLabels, data: GTData, style: list[Union[CellStyle, FootnoteE
 
         # Add footnote info for this column
         for footnote_info in new_footnotes:
-            updated_footnote = replace(footnote_info, locname=loc, colname=name, locnum=4)
+            updated_footnote = replace(footnote_info, locname=loc, colname=name)
             updated_footnotes.append(updated_footnote)
 
     return data._replace(
@@ -1267,7 +1257,7 @@ def _(loc: LocSpannerLabels, data: GTData, style: list[Union[CellStyle, Footnote
     updated_footnotes = []
     for spanner_id in new_loc.ids:
         for footnote_info in new_footnotes:
-            updated_footnote = replace(footnote_info, locname=loc, grpname=spanner_id, locnum=3)
+            updated_footnote = replace(footnote_info, locname=loc, grpname=spanner_id)
             updated_footnotes.append(updated_footnote)
 
     return data._replace(
@@ -1290,7 +1280,7 @@ def _(loc: LocRowGroups, data: GTData, style: list[Union[CellStyle, FootnoteEntr
     updated_footnotes = []
     for group_name in row_groups:
         for footnote_info in new_footnotes:
-            updated_footnote = replace(footnote_info, locname=loc, grpname=group_name, locnum=5)
+            updated_footnote = replace(footnote_info, locname=loc, grpname=group_name)
             updated_footnotes.append(updated_footnote)
 
     return data._replace(
@@ -1319,7 +1309,7 @@ def _(
     updated_footnotes = []
     for row_pos in cells:
         for footnote_info in new_footnotes:
-            updated_footnote = replace(footnote_info, locname=loc, rownum=row_pos, locnum=5)
+            updated_footnote = replace(footnote_info, locname=loc, rownum=row_pos)
             updated_footnotes.append(updated_footnote)
 
     return data._replace(
@@ -1354,7 +1344,7 @@ def _(
         # Handle footnotes for this position
         for footnote_info in new_footnotes:
             updated_footnote = replace(
-                footnote_info, locname=loc, colname=col_pos.colname, rownum=col_pos.row, locnum=5
+                footnote_info, locname=loc, colname=col_pos.colname, rownum=col_pos.row
             )
             updated_footnotes.append(updated_footnote)
 

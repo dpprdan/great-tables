@@ -916,7 +916,6 @@ class FootnoteInfo:
     locname: Loc | None = None
     grpname: str | None = None
     colname: str | None = None
-    locnum: int | float | None = None
     rownum: int | None = None
     colnum: int | None = None
     footnotes: list[str] | None = None
