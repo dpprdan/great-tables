@@ -1,5 +1,8 @@
 import polars as pl
+import pandas as pd
 import re
+import pytest
+
 from great_tables import GT, loc, md, html
 from great_tables._gt_data import FootnotePlacement, FootnoteInfo
 from great_tables._text import Text
@@ -7,10 +10,31 @@ from great_tables._utils_render_html import (
     create_body_component_h,
     _apply_footnote_placement,
     _create_footnote_mark_html,
+    _generate_footnote_mark,
     _get_column_index,
     _get_footnote_mark_string,
+    _get_locnum_for_footnote_location,
     _get_spanner_leftmost_column_index,
     _is_numeric_content,
+    _process_footnotes_for_display,
+    _should_display_footnote,
+)
+
+from great_tables._locations import (
+    LocTitle,
+    LocSubTitle,
+    LocStubhead,
+    LocStubheadLabel,
+    LocColumnHeader,
+    LocSpannerLabels,
+    LocColumnLabels,
+    LocRowGroups,
+    LocGrandSummaryStub,
+    LocGrandSummary,
+    LocBody,
+    LocStub,
+    LocFooter,
+    LocSourceNotes,
 )
 
 
@@ -22,8 +46,6 @@ def assert_rendered_body(snapshot, gt):
 
 
 def assert_complete_html_without_style(snapshot, gt):
-    import re
-
     html = gt.as_raw_html()
     html_without_style = re.sub(r"<style>.*?</style>", "", html, flags=re.DOTALL)
 
@@ -836,8 +858,6 @@ def test_apply_footnote_placement():
 
 
 def test_footnote_placement_snapshot_different_types(snapshot):
-    import pandas as pd
-
     # Create test data with different value types
     df = pd.DataFrame(
         {
@@ -872,8 +892,6 @@ def test_footnote_placement_snapshot_different_types(snapshot):
 
 
 def test_footnote_placement_snapshot_left_placement(snapshot):
-    import pandas as pd
-
     df = pd.DataFrame({"integers": [42], "text": ["Hello"], "currency": ["$1,234.56"]})
 
     # Test with explicit left placement
@@ -895,8 +913,6 @@ def test_footnote_placement_snapshot_left_placement(snapshot):
 
 
 def test_footnote_placement_snapshot_right_placement(snapshot):
-    import pandas as pd
-
     df = pd.DataFrame({"integers": [42], "text": ["Hello"], "currency": ["$1,234.56"]})
 
     # Test with explicit right placement
@@ -918,8 +934,6 @@ def test_footnote_placement_snapshot_right_placement(snapshot):
 
 
 def test_source_notes_single_line_with_footnotes():
-    import pandas as pd
-
     df = pd.DataFrame({"values": [42, 123]})
 
     # Create a table with source notes in single-line mode and footnotes
@@ -944,17 +958,13 @@ def test_source_notes_single_line_with_footnotes():
     # Check that footnotes are also present
     assert "Value footnote" in html
 
-    # Verify the HTML structure: source notes should be in a single row
-    import re
-
     # Look for source notes in a single <td> with the `gt_sourcenote` class
     source_note_pattern = r'<tr class="gt_sourcenotes"><td class="gt_sourcenote"[^>]*><span class="gt_from_md">[^<]*First source note[^<]*Second source note[^<]*Third source note[^<]*</span></td></tr>'
+
     assert re.search(source_note_pattern, html)
 
 
 def test_source_notes_multiline_with_footnotes():
-    import pandas as pd
-
     df = pd.DataFrame({"values": [42, 123]})
 
     # Create a table with source notes in multiline mode and footnotes
@@ -978,9 +988,6 @@ def test_source_notes_multiline_with_footnotes():
     # Check that footnotes are also present
     assert "Value footnote" in html
 
-    # Verify the HTML structure: each source note should be in its own row
-    import re
-
     # Look for multiple source note rows
     source_note_rows = re.findall(
         r'<tr class="gt_sourcenotes"><td class="gt_sourcenote"[^>]*>', html
@@ -989,8 +996,6 @@ def test_source_notes_multiline_with_footnotes():
 
 
 def test_footnote_and_source_note_integration():
-    import pandas as pd
-
     df = pd.DataFrame({"numbers": [100, 200], "text": ["Alpha", "Beta"]})
 
     # Create a comprehensive table with both footnotes and source notes
@@ -1005,9 +1010,6 @@ def test_footnote_and_source_note_integration():
     )
 
     html = gt_table._render_as_html()
-
-    # Verify footnotes are applied with correct placement
-    import re
 
     # Numbers should get left placement, text should get right placement
     assert re.search(r"<span[^>]*>1</span> 100", html), "Number footnote should be left-placed"
@@ -1101,3 +1103,186 @@ def test_get_spanner_leftmost_column_index_edge_cases():
     # col2 is at index 1, col3 at index 2, so leftmost is 1
     result = _get_spanner_leftmost_column_index(data, "Test Spanner")
     assert result == 1
+
+
+def test_get_locnum_for_all_location_types():
+    # Hierarchy: Title(1) < SubTitle(2) < Stubhead/StubheadLabel(3) <
+    # ColumnHeader/SpannerLabels(4) < ColumnLabels/RowGroups(5) <
+    # GrandSummaryStub/GrandSummary(5.5) < Body/Stub(6) < unknown(999)
+
+    assert _get_locnum_for_footnote_location(LocTitle()) == 1
+    assert _get_locnum_for_footnote_location(LocSubTitle()) == 2
+    assert _get_locnum_for_footnote_location(LocStubhead()) == 3
+    assert _get_locnum_for_footnote_location(LocStubheadLabel()) == 3
+    assert _get_locnum_for_footnote_location(LocColumnHeader()) == 4
+    assert _get_locnum_for_footnote_location(LocSpannerLabels(ids=["x"])) == 4
+    assert _get_locnum_for_footnote_location(LocColumnLabels(columns="col1")) == 5
+    assert _get_locnum_for_footnote_location(LocRowGroups(rows=None)) == 5
+    assert _get_locnum_for_footnote_location(LocGrandSummaryStub()) == 5.5
+    assert _get_locnum_for_footnote_location(LocGrandSummary(columns="col1")) == 5.5
+    assert _get_locnum_for_footnote_location(LocBody(columns="col1")) == 6
+    assert _get_locnum_for_footnote_location(LocStub(rows=None)) == 6
+
+    # None returns 999
+    assert _get_locnum_for_footnote_location(None) == 999
+
+    # Unknown location types return 999
+    assert _get_locnum_for_footnote_location(LocFooter()) == 999
+    assert _get_locnum_for_footnote_location(LocSourceNotes()) == 999
+
+
+def test_get_locnum_ordering_is_monotonic():
+    locs_in_order = [
+        LocTitle(),
+        LocSubTitle(),
+        LocStubhead(),
+        LocSpannerLabels(ids=["x"]),
+        LocColumnLabels(columns="c"),
+        LocBody(columns="c"),
+    ]
+
+    locnums = [_get_locnum_for_footnote_location(l) for l in locs_in_order]
+
+    assert locnums == sorted(locnums), "locnum values must increase top-to-bottom"
+
+
+def test_as_latex_raises_with_footnotes():
+    df = pl.DataFrame({"col1": [1, 2], "col2": [3, 4]})
+    gt_table = GT(df).tab_footnote(footnote="A note", locations=loc.body(columns="col1", rows=[0]))
+
+    with pytest.raises(NotImplementedError, match="Footnotes are not yet supported in LaTeX"):
+        gt_table.as_latex()
+
+
+def test_tab_footnote_markless():
+    df = pl.DataFrame({"col1": [1, 2], "col2": [3, 4]})
+    gt_table = GT(df).tab_footnote(footnote="Markless note", locations=None)
+
+    html_str = gt_table._render_as_html()
+
+    # The footnote text must appear in the rendered HTML
+    assert "Markless note" in html_str
+
+    # There should be no superscript mark for this footnote in the body
+    # (the note only lives in the footer)
+    built = gt_table._build_data("html")
+
+    footer = _process_footnotes_for_display(built, built._footnotes)
+
+    assert len(footer) == 1
+    assert footer[0]["mark"] == ""
+    assert footer[0]["text"] == "Markless note"
+
+
+def test_tab_footnote_markless_mixed_with_marked():
+    df = pl.DataFrame({"col1": [1, 2], "col2": [3, 4]})
+    gt_table = (
+        GT(df)
+        .tab_footnote(footnote="Marked note", locations=loc.body(columns="col1", rows=[0]))
+        .tab_footnote(footnote="Markless note", locations=None)
+    )
+
+    built = gt_table._build_data("html")
+    footer = _process_footnotes_for_display(built, built._footnotes)
+
+    # Markless footnotes appear first in the footer
+    assert len(footer) == 2
+    assert footer[0]["mark"] == ""
+    assert footer[0]["text"] == "Markless note"
+    assert footer[1]["mark"] != ""
+    assert footer[1]["text"] == "Marked note"
+
+
+def test_footnote_deduplication_across_locations():
+    df = pl.DataFrame({"col1": [1, 2], "col2": [3, 4]})
+    gt_table = (
+        GT(df)
+        .tab_header(title="Title", subtitle="Subtitle")
+        .tab_footnote(footnote="Shared note", locations=loc.title())
+        .tab_footnote(footnote="Shared note", locations=loc.body(columns="col1", rows=[0]))
+    )
+
+    built = gt_table._build_data("html")
+
+    footer = _process_footnotes_for_display(built, built._footnotes)
+
+    # Deduplication: only one entry in the footer
+    assert len(footer) == 1
+    assert footer[0]["text"] == "Shared note"
+
+    # Both locations should get the same mark
+    marks = [_get_footnote_mark_string(built, fn) for fn in built._footnotes]
+
+    assert len(marks) == 2
+    assert marks[0] == marks[1], "Same text in different locations must share a mark"
+
+
+def test_footnote_deduplication_different_text():
+    df = pl.DataFrame({"col1": [1, 2], "col2": [3, 4]})
+    gt_table = (
+        GT(df)
+        .tab_header(title="Title")
+        .tab_footnote(footnote="Note A", locations=loc.title())
+        .tab_footnote(footnote="Note B", locations=loc.body(columns="col1", rows=[0]))
+    )
+
+    built = gt_table._build_data("html")
+
+    footer = _process_footnotes_for_display(built, built._footnotes)
+
+    assert len(footer) == 2
+    assert footer[0]["mark"] != footer[1]["mark"]
+
+
+def test_generate_footnote_mark_numbers():
+    assert _generate_footnote_mark(1, "numbers") == "1"
+    assert _generate_footnote_mark(100, "numbers") == "100"
+
+
+def test_generate_footnote_mark_unknown_type_falls_back_to_numbers():
+    assert _generate_footnote_mark(3, "nonexistent_type") == "3"
+
+
+def test_generate_footnote_mark_empty_symbol_list():
+    # Empty custom list falls back to numbers
+    assert _generate_footnote_mark(1, []) == "1"
+    assert _generate_footnote_mark(5, []) == "5"
+
+
+def test_generate_footnote_mark_cycling_large_index():
+    # standard set has 4 symbols: *, †, ‡, §
+    # Index 5 should cycle back to * doubled
+    assert _generate_footnote_mark(5, "standard") == "**"
+
+    # Index 8 should be § doubled
+    assert _generate_footnote_mark(8, "standard") == "§§"
+
+    # Index 9 should be * tripled
+    assert _generate_footnote_mark(9, "standard") == "***"
+
+
+def test_should_display_footnote_no_colname():
+    df = pl.DataFrame({"col1": [1], "col2": [2]})
+    gt_table = GT(df).cols_hide(columns="col1")
+    built = gt_table._build_data("html")
+
+    # A footnote targeting the title (colname=None) should display
+    fn = FootnoteInfo(locname=None, footnotes=["Note"])
+
+    assert _should_display_footnote(built, fn) is True
+
+
+def test_should_display_footnote_unknown_column():
+    df = pl.DataFrame({"col1": [1]})
+    built = GT(df)._build_data("html")
+
+    fn = FootnoteInfo(colname="nonexistent_col", footnotes=["Note"])
+
+    assert _should_display_footnote(built, fn) is True
+
+
+def test_process_footnotes_for_display_empty():
+    df = pl.DataFrame({"col1": [1]})
+    built = GT(df)._build_data("html")
+
+    assert _process_footnotes_for_display(built, []) == []
