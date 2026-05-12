@@ -36,7 +36,7 @@
   </table>
   
   </div>
-          
+  
   '''
 # ---
 # name: test_footnote_placement_snapshot_left_placement
@@ -66,7 +66,7 @@
   </table>
   
   </div>
-          
+  
   '''
 # ---
 # name: test_footnote_placement_snapshot_right_placement
@@ -96,7 +96,7 @@
   </table>
   
   </div>
-          
+  
   '''
 # ---
 # name: test_tab_footnote_complete_ordering_snapshot
@@ -137,7 +137,7 @@
   </table>
   
   </div>
-          
+  
   '''
 # ---
 # name: test_tab_footnote_stub_body_ordering_snapshot
