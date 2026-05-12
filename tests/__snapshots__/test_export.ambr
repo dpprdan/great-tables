@@ -132,7 +132,7 @@
   </table>
   
   </div>
-          
+  
   '''
 # ---
 # name: test_html_string_generated_inline_css
@@ -161,6 +161,7 @@
   </table>
   
   </div>
+  
   '''
 # ---
 # name: test_html_string_generated_inline_css_make_page
@@ -193,10 +194,10 @@
   </table>
   
   </div>
-          
   
   
-              </body></html>
+  
+  </body></html>
   '''
 # ---
 # name: test_snap_as_latex

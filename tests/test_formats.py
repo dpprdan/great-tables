@@ -1155,6 +1155,169 @@ def test_fmt_scientific_case(
 
 
 # ------------------------------------------------------------------------------
+# Tests of `fmt_engineering()`
+# ------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "fmt_engineering_kwargs,x_in,x_out",
+    [
+        # Basic decimals=2: test key ranges (very large, large, medium, small, very small)
+        (
+            dict(decimals=2),
+            [
+                829300232923103939802.4,  # Very large (10^18)
+                2323435.1,  # Medium large (10^6)
+                1000.001,  # Boundary (10^3)
+                10.00001,  # No exponent needed
+                0.12345,  # Small (10^-3)
+                0.0000123456,  # Very small (10^-6)
+            ],
+            [
+                "829.30 × 10<sup style='font-size: 65%;'>18</sup>",
+                "2.32 × 10<sup style='font-size: 65%;'>6</sup>",
+                "1.00 × 10<sup style='font-size: 65%;'>3</sup>",
+                "10.00",
+                "123.45 × 10<sup style='font-size: 65%;'>−3</sup>",
+                "12.35 × 10<sup style='font-size: 65%;'>−6</sup>",
+            ],
+        ),
+        # Negative values
+        (
+            dict(decimals=2),
+            [-50000.01, -10.00001, -0.12345],
+            [
+                "−50.00 × 10<sup style='font-size: 65%;'>3</sup>",
+                "−10.00",
+                "−123.45 × 10<sup style='font-size: 65%;'>−3</sup>",
+            ],
+        ),
+        # exp_style="E" format
+        (
+            dict(decimals=2, exp_style="E"),
+            [-3.49e13, 0, 82794],
+            [
+                "−34.90E12",
+                "0.00E00",
+                "82.79E03",
+            ],
+        ),
+        # exp_style="E1" (single digit exponent)
+        (
+            dict(decimals=2, exp_style="E1"),
+            [-3453, 0, 0.00007534],
+            [
+                "−3.45E3",
+                "0.00E0",
+                "75.34E−6",
+            ],
+        ),
+        # force_sign_m: positive/negative/zero
+        (
+            dict(decimals=2, force_sign_m=True),
+            [-3453, 0, 82794],
+            [
+                "−3.45 × 10<sup style='font-size: 65%;'>3</sup>",
+                "0.00",
+                "+82.79 × 10<sup style='font-size: 65%;'>3</sup>",
+            ],
+        ),
+        # force_sign_n: positive/negative exponents
+        (
+            dict(decimals=2, force_sign_n=True),
+            [-0.000234, 82794],
+            [
+                "−234.00 × 10<sup style='font-size: 65%;'>−6</sup>",
+                "82.79 × 10<sup style='font-size: 65%;'>+3</sup>",
+            ],
+        ),
+        # force_sign_m and force_sign_n combined
+        (
+            dict(decimals=2, force_sign_m=True, force_sign_n=True),
+            [-3453, 0, 82794],
+            [
+                "−3.45 × 10<sup style='font-size: 65%;'>+3</sup>",
+                "0.00",
+                "+82.79 × 10<sup style='font-size: 65%;'>+3</sup>",
+            ],
+        ),
+        # pattern
+        (
+            dict(decimals=2, pattern="a {x} b"),
+            [1234.5, 0.000123],
+            [
+                "a 1.23 × 10<sup style='font-size: 65%;'>3</sup> b",
+                "a 123.00 × 10<sup style='font-size: 65%;'>−6</sup> b",
+            ],
+        ),
+        # scale_by
+        (
+            dict(decimals=2, scale_by=1 / 1000),
+            [492032183020.5, 50000.01],
+            [
+                "492.03 × 10<sup style='font-size: 65%;'>6</sup>",
+                "50.00",
+            ],
+        ),
+        # Extreme values with higher precision
+        (
+            dict(decimals=5),
+            [-1.5e200, 2.5, 3.5e200],
+            [
+                "−150.00000 × 10<sup style='font-size: 65%;'>198</sup>",
+                "2.50000",
+                "350.00000 × 10<sup style='font-size: 65%;'>198</sup>",
+            ],
+        ),
+    ],
+)
+def test_fmt_engineering_case(
+    fmt_engineering_kwargs: dict[str, Any], x_in: list[float], x_out: list[str]
+):
+    df = pd.DataFrame({"x": x_in})
+    gt = GT(df).fmt_engineering(columns="x", **fmt_engineering_kwargs)
+    x = _get_column_of_values(gt, column_name="x", context="html")
+
+    assert x == x_out
+
+
+def test_fmt_engineering_with_missing_values():
+    df = pd.DataFrame({"x": [1234.5, None, float("nan"), 0.000123]})
+    gt = GT(df).fmt_engineering(columns="x", decimals=2)
+    x = _get_column_of_values(gt, column_name="x", context="html")
+
+    assert x[1] == "<NA>"
+    assert x[2] == "<NA>"
+
+
+def test_fmt_engineering_exp_style_force_sign():
+    df = pd.DataFrame({"x": [1e6, 1e3, 1, 1e-3, 1e-6]})
+    gt = GT(df).fmt_engineering(columns="x", decimals=2, exp_style="E1", force_sign_n=True)
+    x = _get_column_of_values(gt, column_name="x", context="html")
+
+    assert x == [
+        "1.00E+6",
+        "1.00E+3",
+        "1.00E+0",
+        "1.00E−3",
+        "1.00E−6",
+    ]
+
+
+def test_fmt_engineering_latex_output():
+    df = pd.DataFrame({"x": [1234.5, 0.000123]})
+    gt = GT(df).fmt_engineering(columns="x", decimals=2, pattern="Value: {x} units")
+    x = _get_column_of_values(gt, column_name="x", context="latex")
+
+    assert "Value:" in x[0]
+    assert "units" in x[0]
+    assert "1.23" in x[0]
+    assert "Value:" in x[1]
+    assert "units" in x[1]
+    assert "123.00" in x[1]
+
+
+# ------------------------------------------------------------------------------
 # Tests of `fmt_currency()`
 # ------------------------------------------------------------------------------
 
@@ -2047,11 +2210,22 @@ def _nanoplot_has_tag_attrs(nanoplot_str: str, tag: str, attrs: list[tuple[str, 
 
 df_fmt_nanoplot_single = pl.DataFrame({"vals": [-5.3, 6.3]})
 
+df_fmt_nanoplot_single_different_scales = pl.DataFrame({"vals": [-5.3, 100.0]})
+
 df_fmt_nanoplot_multi = pl.DataFrame(
     {
         "vals": [
             {"x": [-12.0, -5.0, 6.0, 3.0, 0.0, 8.0, -7.0]},
             {"x": [2, 0, 15, 7, 8, 10, 1, 24, 17, 13, 6]},
+        ],
+    }
+)
+
+df_fmt_nanoplot_multi_different_scales = pl.DataFrame(
+    {
+        "vals": [
+            {"x": [-12.0, -5.0, 6.0, 3.0, 0.0, 8.0, -7.0]},
+            {"x": [2, 0, 150, 7, 80, 10, 10, 240, 17, 13, 6]},
         ],
     }
 )
@@ -2421,7 +2595,69 @@ def test_fmt_nanoplot_multi_vals_bar_ref_line_ref_area():
     )
 
 
-# Test category 8: Line-based nanoplot, multiple values per row, reference line and reference area
+# Test category 8: Scale unaffected by unselected rows for single line plot
+def test_fmt_nanoplot_single_vals_same_values_in_selected_rows():
+    # All test cases should have the same scale for each plot when their values are the same in
+    # in selected rows, ignoring values in unselected rows
+
+    for _, params in enumerate(FMT_NANOPLOT_CASES):
+        gt = GT(df_fmt_nanoplot_single).fmt_nanoplot(
+            columns="vals",
+            plot_type="line",
+            rows=[0],
+            **params,
+        )
+
+        gt_different_scales = GT(df_fmt_nanoplot_single_different_scales).fmt_nanoplot(
+            columns="vals",
+            plot_type="line",
+            rows=[0],
+            **params,
+        )
+
+        # Compare the fully-rendered SVG output for row 0 from both DataFrames;
+        # if scaling incorrectly included the non-selected row, the different
+        # values in row 1 would alter the SVG coordinates and break equality
+        res = _get_column_of_values(gt, column_name="vals", context="html")[0]
+        res_different_scales = _get_column_of_values(
+            gt_different_scales, column_name="vals", context="html"
+        )[0]
+        assert res == res_different_scales
+
+
+# Test category 9: Scale unaffected by unselected rows for line plot with multiple values
+def test_fmt_nanoplot_multiple_vals_same_values_in_selected_rows_with_autoscale():
+    # All test cases should have the same scale for each plot when their values are the same in
+    # in selected rows and autoscale is used, ignoring values in unselected rows
+
+    for _, params in enumerate(FMT_NANOPLOT_CASES):
+        gt = GT(df_fmt_nanoplot_multi).fmt_nanoplot(
+            columns="vals",
+            plot_type="line",
+            rows=[0],
+            autoscale=True,
+            **params,
+        )
+
+        gt_different_scales = GT(df_fmt_nanoplot_multi_different_scales).fmt_nanoplot(
+            columns="vals",
+            plot_type="line",
+            rows=[0],
+            autoscale=True,
+            **params,
+        )
+
+        # Compare the fully-rendered SVG output for row 0 from both DataFrames;
+        # if autoscale incorrectly included the non-selected row, the different
+        # values in row 1 would change expand_y bounds and alter SVG coordinates
+        res = _get_column_of_values(gt, column_name="vals", context="html")[0]
+        res_different_scales = _get_column_of_values(
+            gt_different_scales, column_name="vals", context="html"
+        )[0]
+        assert res == res_different_scales
+
+
+# Test category 10: Line-based nanoplot, multiple values per row, reference line and reference area
 def test_fmt_nanoplot_x_y_vals():
     df_fmt_nanoplot_multi_xy = pl.DataFrame(
         {

@@ -63,7 +63,7 @@ def footnotes_split_style_list(
 # Misc Types ===========================================================================
 
 PlacementOptions: TypeAlias = Literal["auto", "left", "right"]
-RowSelectExpr: TypeAlias = 'list[int] | PlExpr | Callable[["TblData"], bool] | None'
+RowSelectExpr: TypeAlias = 'list[int] | int | PlExpr | Callable[["TblData"], bool] | None'
 
 # Locations ============================================================================
 # TODO: these are called cells_* in gt. I prefixed them with Loc just to keep things
