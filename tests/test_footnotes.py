@@ -1105,6 +1105,105 @@ def test_get_spanner_leftmost_column_index_edge_cases():
     assert result == 1
 
 
+def test_tab_footnote_row_group_target_gets_mark():
+    df = pl.DataFrame(
+        {
+            "group": ["A", "A", "B", "B"],
+            "row_id": ["r1", "r2", "r3", "r4"],
+            "col1": [10, 20, 30, 40],
+        }
+    )
+    gt_table = GT(df, rowname_col="row_id", groupname_col="group").tab_footnote(
+        footnote="Row group note", locations=loc.row_groups(rows=["A"])
+    )
+
+    html_str = gt_table.as_raw_html()
+
+    # Footnote text appears in footer
+    assert "Row group note" in html_str
+
+    # Mark appears on the group heading cell
+    assert re.search(
+        r'<th class="gt_group_heading"[^>]*>A'
+        r'<span[^>]*class="gt_footnote_marks"[^>]*>1</span></th>',
+        html_str,
+    )
+
+
+def test_tab_footnote_row_group_multiple_groups():
+    df = pl.DataFrame(
+        {
+            "group": ["A", "A", "B", "B"],
+            "row_id": ["r1", "r2", "r3", "r4"],
+            "col1": [10, 20, 30, 40],
+        }
+    )
+    gt_table = (
+        GT(df, rowname_col="row_id", groupname_col="group")
+        .tab_footnote(footnote="Note for A", locations=loc.row_groups(rows=["A"]))
+        .tab_footnote(footnote="Note for B", locations=loc.row_groups(rows=["B"]))
+    )
+
+    html_str = gt_table.as_raw_html()
+
+    # Both group headings should have marks
+    group_headings = re.findall(r'<th class="gt_group_heading"[^>]*>.*?</th>', html_str)
+    marks_in_headings = [h for h in group_headings if "gt_footnote_marks" in h]
+
+    assert len(marks_in_headings) == 2
+
+
+def test_tab_footnote_grand_summary_target_gets_mark():
+    df = pl.DataFrame({"a": [1, 2], "b": [3, 4]})
+    gt_table = (
+        GT(df)
+        .grand_summary_rows(fns={"Average": pl.mean("a")})
+        .tab_footnote(
+            footnote="Grand summary note",
+            locations=loc.grand_summary(columns="a", rows=[0]),
+        )
+    )
+
+    html_str = gt_table.as_raw_html()
+
+    # Footnote text appears in footer
+    assert "Grand summary note" in html_str
+
+    # Mark appears on the grand summary cell
+    grand_cells = re.findall(
+        r'<td[^>]*class="[^"]*gt_grand_summary_row[^"]*"[^>]*>.*?</td>', html_str
+    )
+    marks_in_cells = [c for c in grand_cells if "gt_footnote_marks" in c]
+
+    assert len(marks_in_cells) == 1
+    assert "1.5" in marks_in_cells[0]
+
+
+def test_tab_footnote_grand_summary_stub_target_gets_mark():
+    df = pl.DataFrame({"a": [1, 2], "b": [3, 4]})
+    gt_table = (
+        GT(df, rowname_col="a")
+        .grand_summary_rows(fns={"Average": pl.mean("b")})
+        .tab_footnote(
+            footnote="Grand summary stub note",
+            locations=loc.grand_summary_stub(rows=[0]),
+        )
+    )
+
+    html_str = gt_table.as_raw_html()
+
+    # Footnote text appears in footer
+    assert "Grand summary stub note" in html_str
+
+    # Mark appears on the grand summary stub cell
+    grand_stubs = re.findall(
+        r'<th[^>]*class="[^"]*gt_grand_summary_row[^"]*"[^>]*>.*?</th>', html_str
+    )
+    marks_in_stubs = [s for s in grand_stubs if "gt_footnote_marks" in s]
+
+    assert len(marks_in_stubs) == 1
+
+
 def test_get_locnum_for_all_location_types():
     # Hierarchy: Title(1) < SubTitle(2) < Stubhead/StubheadLabel(3) <
     # ColumnHeader/SpannerLabels(4) < ColumnLabels/RowGroups(5) <
