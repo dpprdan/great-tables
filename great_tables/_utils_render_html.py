@@ -618,6 +618,7 @@ def create_body_component_h(data: GTData) -> str:
             row_index=i,
             summary_row=summary_row,
             css_class="gt_last_grand_summary_row_top" if i == len(top_g_summary_rows) - 1 else None,
+            data=data,
         )
         body_rows.append(row_html)
 
@@ -647,6 +648,14 @@ def create_body_component_h(data: GTData) -> str:
                     if group_info.group_id in style.grpname
                 ]
                 group_styles = _flatten_styles(_styles, wrap=True)
+
+                # Apply footnote marks to group label
+                footnotes_group = [
+                    x
+                    for x in data._footnotes
+                    if isinstance(x.locname, loc.LocRowGroups) and x.grpname == group_info.group_id
+                ]
+                group_label = _apply_footnotes_to_text(footnotes_group, data, group_label)
 
                 # Add group label that spans multiple columns when row_group_as_column is true
                 if has_group_stub_column:
@@ -708,6 +717,7 @@ def create_body_component_h(data: GTData) -> str:
             row_index=i + len(top_g_summary_rows),
             summary_row=summary_row,
             css_class="gt_first_grand_summary_row_bottom" if i == 0 else None,
+            data=data,
         )
         body_rows.append(row_html)
 
@@ -808,6 +818,23 @@ def _create_row_component_h(
                     x
                     for x in data._footnotes
                     if isinstance(x.locname, loc.LocBody)
+                    and x.colname == colinfo.var
+                    and x.rownum == row_index
+                ]
+                cell_str = _apply_footnotes_to_text(footnotes_i, data, cell_str)
+        elif data is not None and is_summary_row:
+            if colinfo.is_stub:
+                footnotes_i = [
+                    x
+                    for x in data._footnotes
+                    if isinstance(x.locname, loc.LocGrandSummaryStub) and x.rownum == row_index
+                ]
+                cell_str = _apply_footnotes_to_text(footnotes_i, data, cell_str)
+            else:
+                footnotes_i = [
+                    x
+                    for x in data._footnotes
+                    if isinstance(x.locname, loc.LocGrandSummary)
                     and x.colname == colinfo.var
                     and x.rownum == row_index
                 ]
